@@ -12,7 +12,7 @@ class UserFileUpload extends Model
     protected $fillable = [
         'id',
         'user_id',
-        'file_name',
+        'file_path',
         'status',
         'uploaded_at',
     ];
