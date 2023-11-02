@@ -5,6 +5,9 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use App\Models\UserFileUpload;
 use Carbon\Carbon;
+use App\Events\FileStatusNotification;
+use App\Data\FileStatus;
+use App\Data\FileProgress;
 
 class ProductController extends Controller
 {
@@ -35,5 +38,14 @@ class ProductController extends Controller
         $user_file_upload->save();
 
         return 'File ' . $file_path . 'Uploaded';
+    }
+
+    public function test()
+    {
+        $file_progress = new FileProgress('pending', '11%');
+        $file_status = new FileStatus('1', 'time', 'test_file_name', $file_progress);
+        broadcast(new FileStatusNotification(auth()->user(), $file_status));
+        
+        return 'Ok';
     }
 }

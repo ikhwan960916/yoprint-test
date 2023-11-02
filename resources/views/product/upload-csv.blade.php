@@ -107,7 +107,7 @@
         }
     });
 
-    window.Echo.private('item.1').listen('TestEvent', e => {
+    window.Echo.private('file-upload-status.1').listen('FileStatusNotification', e => {
         console.log("Message", e);
     });
 
