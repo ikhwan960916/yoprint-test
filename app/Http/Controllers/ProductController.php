@@ -35,8 +35,8 @@ class ProductController extends Controller
 
         // ensuring that the operation is atomic
         $lock = Cache::lock($content_hash, 20);
+        $file_name = time() . '_' . $request->file->getClientOriginalName();
         if ($lock->get()){
-            $file_name = time() . '_' . $request->file->getClientOriginalName();
             $file_path = $request->file('file')->storeAs('uploads', $file_name, 'public');
 
             $user_file_upload = new UserFileUpload([
@@ -48,23 +48,26 @@ class ProductController extends Controller
             ]);
             $user_file_upload->save();
 
+            // Broadcast status
+            $file_status = new FileStatus(
+                $user_file_upload->id, 
+                $user_file_upload->uploaded_at, 
+                $user_file_upload->file_path,
+                $user_file_upload->file_name
+            );
+            $file_status = $file_status->setStatusAndProgress('PENDING', 0);
+            broadcast(new FileStatusNotification($user_file_upload->user_id, $file_status));
+
+            sleep(5);
             ProcessCSV::dispatch($user_file_upload);
 
             $lock->release();
 
             return 'File ' . $file_path . 'Uploaded';
         } else {
-            return response("Same file upload detected. Unable to upload $file_path", 400)
+            return response("Same file upload detected.", 400)
                     ->header('Content-Type', 'text/plain');
         }
     }
 
-    public function test()
-    {
-        $file_progress = new FileProgress('pending', '11%');
-        $file_status = new FileStatus('1', 'time', 'test_file_name', $file_progress);
-        broadcast(new FileStatusNotification(auth()->user(), $file_status));
-        
-        return 'Ok';
-    }
 }

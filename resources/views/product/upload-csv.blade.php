@@ -9,9 +9,9 @@
   <style>
     #wrapper {
       display: flex;
-      width: 400px;
       border: 1px solid black;
       padding: 10px;
+      margin-right: 20px;
     }
 
     #drop_zone {
@@ -32,7 +32,7 @@
     table {
       border-collapse: collapse;
       width: 100%;
-      margin-top: 20px;
+      margin-top: 15px;
     }
 
     th,
@@ -107,8 +107,10 @@
         }
     });
 
-    window.Echo.private('file-upload-status.1').listen('FileStatusNotification', e => {
-        console.log("Message", e);
+    const channel = 'file-upload-status.{{auth()->user()->id}}';
+    window.Echo.private(channel).listen('FileStatusNotification', e => {
+      console.log(JSON.stringify(e));
+      addTableRow(e);
     });
 
     uploadBtn.addEventListener('click', function (e) {
@@ -174,16 +176,6 @@
             } catch (error) {
                 console.error(error);
             }
-
-            const exampleFileStatus = {
-                id: 1,
-                time: `12-3-3:${getRandomNumber(1, 30)}am`,
-                file_name: `example.txt`,
-                status: "completed"
-            };
-
-            addTableRow(exampleFileStatus);
-            resolve();
         });
 
         queue.enqueue(() => task1Promise);
@@ -198,41 +190,44 @@
         return Math.floor(Math.random() * (max - min) + min);
     }
 
-    function addTableRow(fileStatus) {
+    function addTableRow(fileStatusNotification) {
         const table = document.getElementById("fileStatusTable").getElementsByTagName('tbody')[0];
 
         // Update those with existing id
-        const existingRow = document.querySelector(`[data-id="${fileStatus.id}"]`);
+        const existingRow = document.querySelector(`[data-id="${fileStatusNotification.file_status.file_id}"]`);
         if (existingRow) {
-          updateTableRow(fileStatus);
+          updateTableRow(fileStatusNotification);
           return;
         }
 
         // insert new row with data-id attribute
         const newRow = table.insertRow();
-        newRow.setAttribute("data-id", fileStatus.id);
+        newRow.setAttribute("data-id", fileStatusNotification.file_status.file_id);
 
         // Time
         const timeCell = newRow.insertCell(0);
-        timeCell.textContent = fileStatus.time;
+        timeCell.textContent = fileStatusNotification.file_status.uploaded_time;
 
         // File Name
         const fileNameCell = newRow.insertCell(1);
-        fileNameCell.textContent = fileStatus.file_name;
+        fileNameCell.textContent = fileStatusNotification.file_status.file_name;
 
         // Status
         const statusCell = newRow.insertCell(2);
-        statusCell.textContent = fileStatus.status;
+        statusCell.textContent = fileStatusNotification.file_status.file_progress.status;
     }
 
-    function updateTableRow(fileStatus) {
+    function updateTableRow(fileStatusNotification) {
         // Find row with matching data-id attribute
-        const rowToUpdate = document.querySelector(`[data-id="${fileStatus.id}"]`);
+        const rowToUpdate = document.querySelector(`[data-id="${fileStatusNotification.file_status.file_id}"]`);
         if (!rowToUpdate) return;
 
-        rowToUpdate.cells[0].textContent = fileStatus.time;
-        rowToUpdate.cells[1].textContent = fileStatus.file_name;
-        rowToUpdate.cells[2].textContent = fileStatus.status;
+        rowToUpdate.cells[0].textContent = fileStatusNotification.file_status.uploaded_time;
+        rowToUpdate.cells[1].textContent = fileStatusNotification.file_status.file_name;
+
+        let status = fileStatusNotification.file_status.file_progress.status;
+        let statusContent = status == 'PROCESSING' ? `${status} (${fileStatusNotification.file_status.file_progress.progress_percentage}%)`: status;
+        rowToUpdate.cells[2].textContent = statusContent;
     }
 
   </script>

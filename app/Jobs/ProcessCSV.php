@@ -8,15 +8,19 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use App\Models\UserFileUpload;
 Use Illuminate\Support\Facades\Log;
 use App\Data\FileStatus;
 use App\Events\FileStatusNotification;
+use Illuminate\Support\Facades\Cache;
+use App\Models\UserFileUpload;
+use App\Models\Product;
 use App\Models\User;
 
 class ProcessCSV implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
+
+    public $timeout = 0;
 
     // column definitions
     const UNIQUE_KEY_COLUMN      = 0;
@@ -26,7 +30,7 @@ class ProcessCSV implements ShouldQueue
     const COLOR_NAME_COLUMN      = 14;
     const SIZE_COLUMN            = 18;
     const PIECE_PRICE_COLUMN     = 21;
-    const SANMAR_MAINFRAME_COLOR = 28;
+    const SANMAR_MAINFRAME_COLOR_COLUMN = 28;
 
     public UserFileUpload $user_file_upload;
     /**
@@ -47,19 +51,99 @@ class ProcessCSV implements ShouldQueue
     public function handle()
     {
         Log::info('process csv file START');
-        $user = User::findOrFail($this->user_file_upload->user_id);
-
         $this->sanitizeCSVFile($this->user_file_upload->file_name);
+        $this->updateProducts($this->user_file_upload->file_name);
+        Log::info('process csv file COMPLETED');
+    }
 
-        $user_id = $user->id;
-
+    /**
+     * Update products by csv
+     */
+    private function updateProducts($file_name)
+    {
         $this->user_file_upload->status = 'PROCESSING';
         $this->user_file_upload->save();
-        $this->broadcastCSVProcessingStatus($this->user_file_upload, 'PROCESSING', 50);
+        $this->broadcastCSVProcessingStatus($this->user_file_upload, 'PROCESSING', 0);
+
+        $row_count = $this->countCSVRows($file_name);
+
+        $csv_file_path = storage_path('app/public/uploads/') . $file_name;
+
+        $prev_percentage = 0;
+        if (($handle = fopen($csv_file_path, 'r')) !== false) {
+
+            $current_row = 1;
+            while (($data = fgetcsv($handle)) !== false) {
+                
+                // critical section
+                $unique_key = intval($data[self::UNIQUE_KEY_COLUMN]);
+                Cache::lock("$unique_key", 5)->block(5, function() use ($unique_key, $data, &$current_row, &$prev_percentage, $row_count){
+                    try{
+
+                        // Upsert operation
+                        $product = Product::where('unique_key', $unique_key)->first() ?? new Product;
+                        $product->unique_key = $unique_key;
+                        $product->title = $data[self::PRODUCT_TITLE_COLUMN];
+                        $product->description = $data[self::PRODUCT_DESC_COLUMN];
+                        $product->style = $data[self::STYLE_COLUMN];
+                        $product->sanmar_mainframe_size = $data[self::SANMAR_MAINFRAME_COLOR_COLUMN];
+                        $product->size = $data[self::SIZE_COLUMN];
+                        $product->color_name = $data[self::COLOR_NAME_COLUMN];
+                        $product->piece_price = (float) $data[self::PIECE_PRICE_COLUMN];
+
+                        /**
+                         * Database operation will be performed if the 
+                         * product model is dirty (i.e has changes on columns).
+                         */
+                        $product->save();
+
+                    } catch (\Exception $e){
+                        $this->broadcastCSVProcessingStatus($this->user_file_upload, 'FAILED', 0);
+                        throw $e;
+                    }
+
+                    $current_row++;
+
+                    $percentage_progress = round(($current_row / $row_count) * 100);
+                    if ($percentage_progress < 100 && $prev_percentage != $percentage_progress){
+                        $prev_percentage = $percentage_progress;
+                        $this->broadcastCSVProcessingStatus($this->user_file_upload, 'PROCESSING', $percentage_progress);
+                    }
+                    
+                });
+
+                /**
+                 * Simulating delays for the test file or else would be too fast, i
+                 * In production this code should not be there
+                 */
+                if ($row_count < 20)
+                {
+                    sleep(1);
+                }
+
+            }
+            fclose($handle);
+        }
 
         $this->user_file_upload->status = 'DONE';
         $this->user_file_upload->save();
         $this->broadcastCSVProcessingStatus($this->user_file_upload, 'DONE', 100);
+    }
+
+    private function countCSVRows($file_name)
+    {
+        $csv_file_path = storage_path('app/public/uploads/') . $file_name;
+        if (($handle = fopen($csv_file_path, 'r')) !== false) {
+            $current_row = 1;
+            $row_count = 0;
+            while (!feof($handle)) {
+                fgetcsv($handle);
+                $row_count++;
+            }
+            $row_count = $row_count - 1;
+        }
+
+        return $row_count;
     }
 
     /**
