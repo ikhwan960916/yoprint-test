@@ -26,7 +26,7 @@ return new class extends Migration
     public function down()
     {
         Schema::table('user_file_uploads', function (Blueprint $table) {
-            //
+            $table->dropColumn('file_name');
         });
     }
 };

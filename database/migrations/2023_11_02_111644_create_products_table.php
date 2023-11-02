@@ -19,9 +19,9 @@ return new class extends Migration
             $table->text('title');
             $table->text('description');
             $table->string('style', 20);
-            $table->string('sanmar_mainframe_size', 20);
+            $table->text('sanmar_mainframe_size');
             $table->string('size', 5);
-            $table->string('color_name', 20);
+            $table->string('color_name', 100);
             $table->unsignedDecimal('piece_price', $precision = 8, $scale = 2);
             $table->timestamps();
         });
