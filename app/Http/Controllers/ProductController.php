@@ -33,7 +33,7 @@ class ProductController extends Controller
         $file = $request->file('file');
         $content_hash = hash_file('sha256', $file->getPathname());
 
-        // ensuring that the operation is atomic
+        // handling race conditions
         $lock = Cache::lock($content_hash, 20);
         $file_name = time() . '_' . $request->file->getClientOriginalName();
         if ($lock->get()){
@@ -60,7 +60,7 @@ class ProductController extends Controller
 
             // freeze to show PENDING on upload ui
             sleep(3);
-            
+
             ProcessCSV::dispatch($user_file_upload);
 
             $lock->release();
