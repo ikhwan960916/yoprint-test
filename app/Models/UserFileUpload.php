@@ -13,6 +13,7 @@ class UserFileUpload extends Model
         'id',
         'user_id',
         'file_path',
+        'file_name',
         'status',
         'uploaded_at',
     ];

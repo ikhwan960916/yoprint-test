@@ -17,16 +17,16 @@ class FileStatusNotification implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
-    public $user;
+    public $user_id;
     public FileStatus $file_status;
     /**
      * Create a new event instance.
      *
      * @return void
      */
-    public function __construct(User $user, FileStatus $file_status)
+    public function __construct($user_id, FileStatus $file_status)
     {
-        $this->user = $user;
+        $this->user_id = $user_id;
         $this->file_status = $file_status;
     }
 
@@ -37,6 +37,6 @@ class FileStatusNotification implements ShouldBroadcast
      */
     public function broadcastOn()
     {
-        return new PrivateChannel('file-upload-status.' . $this->user->id);
+        return new PrivateChannel('file-upload-status.' . $this->user_id);
     }
 }
