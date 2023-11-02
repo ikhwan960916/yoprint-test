@@ -58,7 +58,9 @@ class ProductController extends Controller
             $file_status = $file_status->setStatusAndProgress('PENDING', 0);
             broadcast(new FileStatusNotification($user_file_upload->user_id, $file_status));
 
-            sleep(5);
+            // freeze to show PENDING on upload ui
+            sleep(3);
+            
             ProcessCSV::dispatch($user_file_upload);
 
             $lock->release();
