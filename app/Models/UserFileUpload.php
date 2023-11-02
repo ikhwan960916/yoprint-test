@@ -8,4 +8,12 @@ use Illuminate\Database\Eloquent\Model;
 class UserFileUpload extends Model
 {
     use HasFactory;
+
+    protected $fillable = [
+        'id',
+        'user_id',
+        'file_name',
+        'status',
+        'uploaded_at',
+    ];
 }
